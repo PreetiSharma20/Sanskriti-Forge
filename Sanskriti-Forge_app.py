@@ -1,7 +1,6 @@
 import streamlit as st
 from transformers import pipeline
 import os
-import pandas as pd
 
 # Install necessary dependencies (this is just for installation when running locally)
 os.system('pip install streamlit torch transformers pandas')
@@ -14,58 +13,70 @@ st.markdown("""
     Ask me anything about festivals, rituals, temples, mythology, art, or history! 🙏🇮🇳
 """)
 
-# Check if PyTorch is installed
-import torch
-st.write(f"PyTorch version: {torch.__version__}")
-
-# Load pre-trained model from Hugging Face
+# Load pre-trained model from Hugging Face, use a smaller model for quicker responses
 @st.cache_resource(show_spinner=True)
 def load_model():
     try:
-        model = pipeline("text-generation", model="gpt2")
+        model = pipeline("text-generation", model="distilgpt2")  # Using a smaller model for faster performance
         return model
     except Exception as e:
         st.error(f"Error loading the model: {str(e)}")
 
 nlp = load_model()
 
-# Initialize chat history in session state
+# Initialize chat history in session state if not already
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
 
-# Function to generate a response
-def generate_response(user_input):
-    # Combine previous history with the user input to make conversation flow better
-    conversation = "\n".join(st.session_state.conversation_history) + "\nUser: " + user_input
-    response = nlp(conversation, max_length=200, do_sample=True, temperature=0.7)[0]['generated_text']
+# Function to generate a response with a shorter max_length for faster replies
+def generate_response(user_input, context=""):
+    conversation = context + "\nUser: " + user_input
+    response = nlp(conversation, max_length=100, do_sample=True, temperature=0.7)[0]['generated_text']
     
     # Clean the response by removing the prompt part
     generated_response = response.split("User:")[-1].strip()
     return generated_response
 
-# Chat input and displaying conversation
+# Display chat history
+def display_chat():
+    for i, message in enumerate(st.session_state.conversation_history):
+        # Display the user's message
+        if message['role'] == 'user':
+            st.markdown(f"**User**: {message['text']}")
+            # Option to reply to this message
+            if st.button(f"Reply to User's message {i+1}", key=f"user_reply_{i}"):
+                user_input = st.text_input("Your reply:", placeholder="Type your reply here")
+                if user_input:
+                    context = "\n".join([msg['text'] for msg in st.session_state.conversation_history[:i+1]])
+                    response = generate_response(user_input, context)
+                    st.session_state.conversation_history.append({'role': 'user', 'text': user_input})
+                    st.session_state.conversation_history.append({'role': 'bot', 'text': response})
+                    st.experimental_rerun()  # Rerun to update the UI
+
+        # Display the bot's response
+        elif message['role'] == 'bot':
+            st.markdown(f"**Sanskriti-Forge**: {message['text']}")
+
+# User input section
 user_input = st.text_input("📝 Enter your cultural query:", placeholder="e.g., Tell me about Pongal festival")
 
 # When user inputs something
 if user_input:
-    # Get chatbot's response
+    # Generate response from the bot
     with st.spinner("Generating cultural insights..."):
-        chatbot_response = generate_response(user_input)
+        response = generate_response(user_input)
     
-    # Store the user input and chatbot response in the session state to maintain history
-    st.session_state.conversation_history.append(f"User: {user_input}")
-    st.session_state.conversation_history.append(f"Sanskriti-Forge: {chatbot_response}")
+    # Add user query and bot response to conversation history
+    st.session_state.conversation_history.append({'role': 'user', 'text': user_input})
+    st.session_state.conversation_history.append({'role': 'bot', 'text': response})
 
-    # Display the conversation
-    for message in st.session_state.conversation_history:
-        if message.startswith("User:"):
-            st.markdown(f"**User:** {message[6:]}")
-        else:
-            st.markdown(f"**Sanskriti-Forge:** {message[16:]}")
+# Display chat interface
+display_chat()
 
 # Optional: Save the conversation dataset
 if st.button("📁 Download Knowledge Dataset"):
-    df = pd.DataFrame(st.session_state.get("conversation_history", []), columns=["Conversation"])
+    import pandas as pd
+    df = pd.DataFrame([{"role": msg['role'], "text": msg['text']} for msg in st.session_state.conversation_history])
     csv = df.to_csv(index=False).encode('utf-8')
     st.download_button("⬇️ Download CSV", csv, "sanskriti_knowledge_pool.csv", "text/csv")
 
