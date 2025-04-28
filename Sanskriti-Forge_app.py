@@ -48,6 +48,10 @@ nlp = load_model()
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = deque(maxlen=10)  # Keeping last 10 messages
 
+# Initialize input box in session state
+if "input_box" not in st.session_state:
+    st.session_state.input_box = ""  # Initialize input box in session_state
+
 # UI for displaying conversation history
 def display_conversation_history():
     st.sidebar.markdown("### Conversation History", unsafe_allow_html=True)
