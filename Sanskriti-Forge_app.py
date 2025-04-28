@@ -2,7 +2,7 @@ import streamlit as st
 import os
 
 # Ensure that the necessary libraries are installed
-os.system('pip install torch==2.0.1 transformers==4.26.0 pandas==1.5.3')
+os.system('pip install streamlit torch transformers pandas')
 
 # Page configuration
 st.set_page_config(page_title="Sanskriti-Forge", layout="centered")
