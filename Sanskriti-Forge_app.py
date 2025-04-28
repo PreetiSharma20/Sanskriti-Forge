@@ -58,7 +58,7 @@ def display_chat():
                 """, unsafe_allow_html=True)
 
 # User input section
-user_input = st.text_input("📝 Enter your cultural query:", placeholder="e.g., Tell me about Pongal festival")
+user_input = st.text_input("📝 Enter your cultural query:", placeholder="e.g., Tell me about Pongal festival", key="user_input")
 
 # When user inputs something
 if user_input:
@@ -69,6 +69,9 @@ if user_input:
     # Add user query and bot response to conversation history
     st.session_state.conversation_history.append({'role': 'user', 'text': user_input})
     st.session_state.conversation_history.append({'role': 'bot', 'text': response})
+    
+    # Clear the input field after submitting
+    st.session_state.user_input = ""  # Reset the input field after the response
 
 # Display chat interface
 display_chat()
