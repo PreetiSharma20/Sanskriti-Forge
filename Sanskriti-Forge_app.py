@@ -1,100 +1,88 @@
 import streamlit as st
 from transformers import pipeline
+from duckduckgo_search import DDGS
+import requests
+from bs4 import BeautifulSoup
 
-# Page configuration
-st.set_page_config(page_title="Sanskriti-Forge", layout="wide")
-st.title("🧠 Sanskriti-Forge: Explore Indian Culture")
-st.markdown("""
-    Welcome to **Sanskriti-Forge**, your AI companion for exploring India's rich cultural heritage.
-    Ask me anything about festivals, rituals, temples, mythology, art, or history! 🙏🇮🇳
-""")
+# Initialize Hugging Face models
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+sentiment_analyzer = pipeline("sentiment-analysis")
 
-# Function to load pre-trained model
-@st.cache_resource(show_spinner=True)
-def load_model():
-    try:
-        # Load the model
-        model = pipeline("text-generation", model="distilgpt2")  # Replace with the appropriate model for cultural queries
-        return model
-    except Exception as e:
-        st.error(f"Error loading the model: {str(e)}")
-        return None
+# Function to perform DuckDuckGo web search and scrape content
+def web_search_and_scrape(query, num_results=3):
+    urls = []
+    with DDGS() as ddgs:
+        for result in ddgs.text(query, max_results=num_results):
+            urls.append(result["href"])
 
-nlp = load_model()
+    scraped_texts = []
+    for url in urls:
+        try:
+            response = requests.get(url, timeout=5)
+            soup = BeautifulSoup(response.text, "html.parser")
+            paragraphs = soup.find_all('p')
+            text = ' '.join(p.get_text() for p in paragraphs)
+            scraped_texts.append(text[:1500])  # limit per site
+        except:
+            continue
+    return ' '.join(scraped_texts)
 
-# Initialize conversation history if not available
-if "conversation_history" not in st.session_state:
-    st.session_state.conversation_history = []
+# Function to summarize the scraped text using Hugging Face BART model
+def summarize_text(text):
+    if len(text) < 100:
+        return "Not enough information found to summarize."
+    chunks = [text[i:i+1024] for i in range(0, len(text), 1024)]
+    summary = ''
+    for chunk in chunks:
+        summary_piece = summarizer(chunk, max_length=130, min_length=30, do_sample=False)[0]['summary_text']
+        summary += summary_piece + ' '
+    return summary.strip()
 
-# Function to generate AI response
-def generate_response(user_input):
-    if not nlp:
-        return "Error: Model could not be loaded."
-    
-    conversation = "\n".join([f"{msg['role']}: {msg['text']}" for msg in st.session_state.conversation_history])
-    conversation += f"\nUser: {user_input}"
+# Function to analyze sentiment of the summarized content
+def analyze_sentiment(text):
+    result = sentiment_analyzer(text)
+    return result[0]['label'], result[0]['score']
 
-    try:
-        # Generate response from the model
-        response = nlp(conversation, max_length=200, do_sample=True, temperature=0.7)[0]['generated_text']
-        generated_response = response.split("User:")[-1].strip()  # Clean up the response
-        return generated_response
-    except Exception as e:
-        st.error(f"Error generating response: {str(e)}")
-        return "Sorry, I encountered an error while generating the response."
+# Combining all backend functionality for cultural understanding
+def cultural_understanding_agent(prompt):
+    # Search and scrape relevant web data
+    scraped_data = web_search_and_scrape(prompt)
+    # Summarize the scraped data
+    summary = summarize_text(scraped_data)
+    # Analyze sentiment of the summary
+    sentiment, score = analyze_sentiment(summary)
+    return summary, sentiment, score
 
-# Function to display chat interface
-def display_chat():
-    for message in st.session_state.conversation_history:
-        if message['role'] == 'user':
-            st.markdown(f"""
-            <div style="text-align: right; background-color: #e0f7fa; padding: 10px; margin-bottom: 5px; border-radius: 8px; max-width: 70%; display: inline-block;">
-                <b>User:</b> {message['text']}
-            </div>
-            """, unsafe_allow_html=True)
-        elif message['role'] == 'bot':
-            st.markdown(f"""
-            <div style="text-align: left; background-color: #f1f8e9; padding: 10px; margin-bottom: 5px; border-radius: 8px; max-width: 70%; display: inline-block;">
-                <b>Sanskriti-Forge:</b> {message['text']}
-            </div>
-            """, unsafe_allow_html=True)
+# Streamlit UI setup
+st.set_page_config(page_title="Sanskriti-Forge", layout="centered")
+st.title("🧠 Sanskriti-Forge: Indian Culture Chatbot")
 
-# Sidebar for conversation history
-def display_sidebar():
-    st.sidebar.title("Conversation History")
-    for message in reversed(st.session_state.conversation_history):
-        if message['role'] == 'user':
-            st.sidebar.markdown(f"**User:** {message['text']}")
-        elif message['role'] == 'bot':
-            st.sidebar.markdown(f"**Sanskriti-Forge:** {message['text']}")
+# User input
+user_input = st.text_input("📝 Enter your cultural query:", placeholder="e.g., Tell me about Pongal festival")
 
-# User input field at the bottom
-user_input = st.text_input("📝 Enter your cultural query:", placeholder="e.g., Tell me about Pongal festival", key="user_input", help="Type your question and hit Enter!")
-
-# When user submits the query
 if user_input:
-    # Add user input to conversation history
-    st.session_state.conversation_history.append({'role': 'user', 'text': user_input})
-
-    # Generate AI's response
-    with st.spinner("Generating cultural insights..."):
-        response = generate_response(user_input)
+    with st.spinner("🔍 Searching the web and generating cultural insights..."):
+        summary, sentiment, score = cultural_understanding_agent(user_input)
     
-    # Add AI's response to conversation history
-    st.session_state.conversation_history.append({'role': 'bot', 'text': response})
+    # Display the summary
+    st.markdown("### 🤖 Sanskriti-Forge's Cultural Insight:")
+    st.write(summary)
+    
+    # Display sentiment analysis result
+    st.markdown(f"### 🌟 Sentiment Analysis:")
+    st.write(f"Sentiment: **{sentiment}** with a confidence score of {score:.2f}")
+    
+    # Option to save the result to session state (knowledge pool)
+    if "dataset" not in st.session_state:
+        st.session_state.dataset = []
+    st.session_state.dataset.append({"query": user_input, "response": summary, "sentiment": sentiment, "score": score})
 
-    # Clear the input field after submitting
-    st.session_state.user_input = ""  # Reset input field
+    # Download dataset button
+    if st.button("📁 Download Knowledge Dataset"):
+        import pandas as pd
+        df = pd.DataFrame(st.session_state.get("dataset", []))
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button("⬇️ Download CSV", csv, "sanskriti_knowledge_pool.csv", "text/csv")
 
-# Create layout with columns
-col1, col2 = st.columns([2, 5])
-
-# Display the conversation
-with col2:
-    display_chat()
-
-# Display the sidebar with history
-display_sidebar()
-
-# Footer for the app
+# Footer
 st.markdown("""<hr><center>Built with ❤️ for Bharat</center>""", unsafe_allow_html=True)
