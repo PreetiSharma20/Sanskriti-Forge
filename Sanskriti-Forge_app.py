@@ -1,105 +1,107 @@
 import streamlit as st
 from transformers import pipeline
-import requests
-from duckduckgo_search import DDGS
-from bs4 import BeautifulSoup
+from collections import deque
 
 # Page configuration
 st.set_page_config(page_title="Sanskriti-Forge", layout="wide")
-st.title("🧠 Sanskriti-Forge: Indian Culture Chatbot")
 
-# Header image with container width
-st.image("https://upload.wikimedia.org/wikipedia/commons/0/0b/Indian_Culture_Header_Image.jpg", use_container_width=True)
-
+# Title and introductory message
 st.markdown("""
-Welcome to **Sanskriti-Forge**, your AI companion for exploring India's rich cultural heritage.
-Ask me anything about festivals, rituals, temples, mythology, art, or history! 🙏🇮🇳
-""")
+    <div style="text-align:center; color:#4B0082; font-size:30px; font-weight:bold;">
+        🧠 **Sanskriti-Forge**: Indian Culture Chatbot
+    </div>
+    <div style="text-align:center; font-size:18px; color:#8B0000;">
+        Your AI companion for exploring India's rich cultural heritage.
+        Ask me anything about festivals, rituals, temples, mythology, art, or history! 🙏🇮🇳
+    </div>
+""", unsafe_allow_html=True)
 
-# Initialize Hugging Face model
+# Indian Cultural Theme Color
+st.markdown("""
+    <style>
+        body {
+            background-color: #F9F4DB;
+        }
+        .stTextInput>div>div>input {
+            background-color: #FFF5E1;
+        }
+        .stButton>button {
+            background-color: #D4A5A5;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Load the model
 @st.cache_resource(show_spinner=True)
 def load_model():
-    return pipeline("text-generation", model="gpt2")
+    try:
+        return pipeline("text-generation", model="gpt2")
+    except Exception as e:
+        st.error(f"Error loading the model: {str(e)}")
+        return None
 
 nlp = load_model()
 
-# Initialize session state for conversation tracking
-if 'conversation_history' not in st.session_state:
-    st.session_state.conversation_history = []
+# Initialize conversation history as a deque (for efficient pop from the front)
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = deque(maxlen=10)  # Keeping last 10 messages
 
-if 'dataset' not in st.session_state:
-    st.session_state.dataset = []
+# UI for displaying conversation history
+def display_conversation_history():
+    st.sidebar.markdown("### Conversation History", unsafe_allow_html=True)
+    if len(st.session_state.conversation_history) > 0:
+        for idx, message in enumerate(st.session_state.conversation_history):
+            st.sidebar.markdown(f"**User:** {message['query']}")
+            st.sidebar.markdown(f"**Sanskriti-Forge:** {message['response']}")
+            st.sidebar.markdown("-" * 50)
 
-# Function for web scraping and summarization
-def web_search_and_scrape(query, num_results=3):
-    urls = []
-    with DDGS() as ddgs:
-        for result in ddgs.text(query, max_results=num_results):
-            urls.append(result["href"])
+# Input field at the bottom
+def display_input_field():
+    with st.container():
+        user_input = st.text_input("📝 Ask your cultural query here:", placeholder="e.g., Tell me about Diwali festival...", key="input_box")
+        if user_input:
+            st.session_state.input_box = ""  # Clear the input field after submission
+            return user_input
+        return None
 
-    scraped_texts = []
-    for url in urls:
-        try:
-            response = requests.get(url, timeout=5)
-            soup = BeautifulSoup(response.text, "html.parser")
-            paragraphs = soup.find_all('p')
-            text = ' '.join(p.get_text() for p in paragraphs)
-            scraped_texts.append(text[:1500])  # limit per site
-        except:
-            continue
-    return ' '.join(scraped_texts)
+# Response function
+def get_response(user_input):
+    try:
+        result = nlp(user_input, max_length=200, do_sample=True, temperature=0.7)[0]['generated_text']
+        return result.strip()
+    except Exception as e:
+        return f"Error processing your request: {str(e)}"
 
-# Summarize the content using Hugging Face BART model
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+# Add to conversation history and update sidebar
+def add_to_history(user_input, result):
+    st.session_state.conversation_history.append({"query": user_input, "response": result})
 
-def summarize_text(text):
-    if len(text) < 100:
-        return "Not enough information found to summarize."
-    chunks = [text[i:i+1024] for i in range(0, len(text), 1024)]
-    summary = ''
-    for chunk in chunks:
-        summary_piece = summarizer(chunk, max_length=130, min_length=30, do_sample=False)[0]['summary_text']
-        summary += summary_piece + ' '
-    return summary.strip()
+# Display the conversation
+def display_conversation(user_input, result):
+    st.markdown(f"**User:** {user_input}")
+    st.markdown(f"**Sanskriti-Forge:** {result}")
 
-# Function for generating cultural understanding summary
-def cultural_understanding_agent(prompt):
-    scraped_data = web_search_and_scrape(prompt)
-    summary = summarize_text(scraped_data)
-    return summary
+# Main function to handle chat flow
+def main():
+    # Display the conversation history on the sidebar
+    display_conversation_history()
 
-# Define function to handle user input and interaction
-def handle_user_input(user_input):
+    # Display the prompt at the bottom of the page
+    user_input = display_input_field()
+
     if user_input:
-        # Display the user query
-        st.session_state.conversation_history.append({"user": user_input})
+        with st.spinner("Generating cultural insights..."):
+            result = get_response(user_input)
+        
+        # Add the conversation to history and display the conversation
+        add_to_history(user_input, result)
+        display_conversation(user_input, result)
 
-        # Fetch cultural understanding or response
-        with st.spinner("Processing your query..."):
-            result = cultural_understanding_agent(user_input)
+# Run the main function
+if __name__ == "__main__":
+    main()
 
-        # Display AI's response
-        st.session_state.conversation_history.append({"bot": result})
-
-# Input field for user query
-user_input = st.text_input("📝 Enter your cultural query:", placeholder="e.g., Tell me about the festival of Diwali", key="user_input")
-
-if user_input:
-    handle_user_input(user_input)
-
-# Sidebar for Conversation History Toggle
-with st.sidebar:
-    # History Toggle Button
-    if st.button("📜 View Conversation History"):
-        st.write("### Conversation History")
-        for message in st.session_state.conversation_history:
-            if "user" in message:
-                st.markdown(f"**You**: {message['user']}")
-            elif "bot" in message:
-                st.markdown(f"**Sanskriti-Forge**: {message['bot']}")
-                
-# Footer with fixed prompt input at the bottom
-st.markdown("""
-<hr>
-<center>Built with ❤️ for Bharat</center>
-""", unsafe_allow_html=True)
+# Footer
+st.markdown("<hr><center>Built with ❤️ for Bharat</center>", unsafe_allow_html=True)
