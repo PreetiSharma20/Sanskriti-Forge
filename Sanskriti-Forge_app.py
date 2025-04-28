@@ -45,14 +45,14 @@ def display_chat():
             if 'role' in message:
                 if message['role'] == 'user':
                     st.markdown(f"""
-                    <div style="text-align: right; background-color: #e0f7fa; padding: 10px; margin-bottom: 5px; border-radius: 8px;">
+                    <div style="text-align: right; background-color: #e0f7fa; padding: 10px; margin-bottom: 5px; border-radius: 8px; max-width: 70%; display: inline-block; clear: both;">
                         <b>User:</b> {message['text']}
                     </div>
                     """, unsafe_allow_html=True)
 
                 elif message['role'] == 'bot':
                     st.markdown(f"""
-                    <div style="text-align: left; background-color: #f1f8e9; padding: 10px; margin-bottom: 5px; border-radius: 8px;">
+                    <div style="text-align: left; background-color: #f1f8e9; padding: 10px; margin-bottom: 5px; border-radius: 8px; max-width: 70%; display: inline-block; clear: both;">
                         <b>Sanskriti-Forge:</b> {message['text']}
                     </div>
                     """, unsafe_allow_html=True)
