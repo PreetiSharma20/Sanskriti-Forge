@@ -1,6 +1,5 @@
 import streamlit as st
 from transformers import pipeline
-from PIL import Image
 
 # Page configuration
 st.set_page_config(page_title="Sanskriti-Forge", layout="wide")
@@ -53,14 +52,6 @@ def display_chat():
             </div>
             """, unsafe_allow_html=True)
 
-# Load a few images related to Indian culture
-def display_cultural_images():
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        st.image("https://upload.wikimedia.org/wikipedia/commons/8/8d/Tirupati_Temple.jpg", caption="Tirupati Temple", use_column_width=True)
-    with col2:
-        st.image("https://upload.wikimedia.org/wikipedia/commons/1/1e/Dussehra_festival_in_India.jpg", caption="Dussehra Festival", use_column_width=True)
-
 # Sidebar for history
 def display_sidebar():
     st.sidebar.title("Conversation History")
@@ -91,23 +82,12 @@ if user_input:
 # Create two columns for content and chat interaction
 col1, col2 = st.columns([2, 5])
 
-# Show graphics and cultural images
-with col1:
-    display_cultural_images()
-
 # Show chat interface
 with col2:
     display_chat()
 
 # Display the sidebar for history
 display_sidebar()
-
-# Optional: Save the conversation dataset
-if st.button("📁 Download Knowledge Dataset"):
-    import pandas as pd
-    df = pd.DataFrame([{"role": msg['role'], "text": msg['text']} for msg in st.session_state.conversation_history])
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button("⬇️ Download CSV", csv, "sanskriti_knowledge_pool.csv", "text/csv")
 
 # Footer
 st.markdown("""<hr><center>Built with ❤️ for Bharat</center>""", unsafe_allow_html=True)
