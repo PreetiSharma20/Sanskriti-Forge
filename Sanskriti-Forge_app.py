@@ -1,124 +1,105 @@
 import streamlit as st
 from transformers import pipeline
-import pandas as pd
+import requests
+from duckduckgo_search import DDGS
+from bs4 import BeautifulSoup
 
 # Page configuration
-st.set_page_config(page_title="Sanskriti-Forge", layout="centered")
-st.markdown(
-    """
-    <style>
-    body {
-        background-color: #ffefd5;  /* Warm background color (light cream) */
-    }
-    .title {
-        color: #FF6F00;  /* Saffron color for the title */
-        font-family: 'Georgia', serif;
-        font-size: 3em;
-        text-align: center;
-    }
-    .subtitle {
-        color: #4CAF50;  /* Indian green color for the subtitle */
-        font-family: 'Verdana', sans-serif;
-        font-size: 1.5em;
-        text-align: center;
-    }
-    .conversation {
-        font-family: 'Verdana', sans-serif;
-        font-size: 1.1em;
-        background-color: #fff8e1;  /* Light yellow for chat bubble */
-        padding: 10px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        border: 2px solid #FF6F00;
-    }
-    .button {
-        background-color: #FF6F00;  /* Saffron */
-        color: white;
-        border-radius: 10px;
-        padding: 10px;
-    }
-    .footer {
-        text-align: center;
-        color: #FF6F00;
-        font-family: 'Georgia', serif;
-        font-size: 1.2em;
-        padding-top: 20px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+st.set_page_config(page_title="Sanskriti-Forge", layout="wide")
+st.title("🧠 Sanskriti-Forge: Indian Culture Chatbot")
 
-# Add Indian-themed image
-st.image("https://upload.wikimedia.org/wikipedia/commons/0/0b/Indian_Culture_Header_Image.jpg", use_column_width=True)
+# Header image with container width
+st.image("https://upload.wikimedia.org/wikipedia/commons/0/0b/Indian_Culture_Header_Image.jpg", use_container_width=True)
 
-st.markdown(
-    "<div class='title'>🧠 Sanskriti-Forge: Indian Culture Chatbot</div>", unsafe_allow_html=True
-)
-st.markdown(
-    "<div class='subtitle'>Ask me anything about festivals, rituals, temples, mythology, art, or history! 🙏🇮🇳</div>", unsafe_allow_html=True
-)
+st.markdown("""
+Welcome to **Sanskriti-Forge**, your AI companion for exploring India's rich cultural heritage.
+Ask me anything about festivals, rituals, temples, mythology, art, or history! 🙏🇮🇳
+""")
 
-# Load pre-trained model from Hugging Face
+# Initialize Hugging Face model
 @st.cache_resource(show_spinner=True)
 def load_model():
     return pipeline("text-generation", model="gpt2")
 
 nlp = load_model()
 
-# Initialize session state for conversation history if not already present
-if "conversation_history" not in st.session_state:
+# Initialize session state for conversation tracking
+if 'conversation_history' not in st.session_state:
     st.session_state.conversation_history = []
 
-# Create an input form with a button at the bottom to accept user input
-with st.form(key="user_input_form"):
-    user_input = st.text_input("📝 Enter your cultural query:", placeholder="e.g., Tell me about Pongal festival")
-    submit_button = st.form_submit_button(label="Submit", use_container_width=True)
-
-# Handle the conversation and dynamic responses
-if submit_button and user_input:
-    # Append user input to the conversation history
-    st.session_state.conversation_history.append(f"User: {user_input}")
-
-    # Generate the AI's response
-    with st.spinner("Generating cultural insights..."):
-        # Combine conversation history for context
-        conversation = "\n".join(st.session_state.conversation_history)
-        
-        try:
-            result = nlp(conversation, max_length=500, do_sample=True, temperature=0.7)[0]['generated_text']
-            if not result:
-                result = "I'm sorry, I couldn't generate a response. Please try again."
-        except Exception as e:
-            result = f"Error generating response: {str(e)}"
-
-    # Append the AI's response to the conversation history
-    st.session_state.conversation_history.append(f"Sanskriti-Forge: {result.strip()}")
-
-    # Display the conversation history with Indian culture-themed styling
-    st.markdown("### 🗨️ Conversation History:")
-    for i, message in enumerate(st.session_state.conversation_history):
-        if "User:" in message:
-            st.markdown(f"<div class='conversation' style='border-left: 6px solid #4CAF50'>{message}</div>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<div class='conversation' style='border-left: 6px solid #FF6F00'>{message}</div>", unsafe_allow_html=True)
-
-    # Clear the input field (this will happen automatically with form submit)
-    st.experimental_rerun()
-
-# Optional: Save to knowledge pool (simple append to list)
-if "dataset" not in st.session_state:
+if 'dataset' not in st.session_state:
     st.session_state.dataset = []
 
-# Ensure result is valid before saving
-if user_input and result:
-    st.session_state.dataset.append({"query": user_input, "response": result.strip()})
+# Function for web scraping and summarization
+def web_search_and_scrape(query, num_results=3):
+    urls = []
+    with DDGS() as ddgs:
+        for result in ddgs.text(query, max_results=num_results):
+            urls.append(result["href"])
 
-# Export dataset
-if st.button("📁 Download Knowledge Dataset", key="download_button", use_container_width=True):
-    df = pd.DataFrame(st.session_state.get("dataset", []))
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button("⬇️ Download CSV", csv, "sanskriti_knowledge_pool.csv", "text/csv")
+    scraped_texts = []
+    for url in urls:
+        try:
+            response = requests.get(url, timeout=5)
+            soup = BeautifulSoup(response.text, "html.parser")
+            paragraphs = soup.find_all('p')
+            text = ' '.join(p.get_text() for p in paragraphs)
+            scraped_texts.append(text[:1500])  # limit per site
+        except:
+            continue
+    return ' '.join(scraped_texts)
 
-# Footer with Indian culture theme
-st.markdown("<div class='footer'>Built with ❤️ for Bharat</div>", unsafe_allow_html=True)
+# Summarize the content using Hugging Face BART model
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+
+def summarize_text(text):
+    if len(text) < 100:
+        return "Not enough information found to summarize."
+    chunks = [text[i:i+1024] for i in range(0, len(text), 1024)]
+    summary = ''
+    for chunk in chunks:
+        summary_piece = summarizer(chunk, max_length=130, min_length=30, do_sample=False)[0]['summary_text']
+        summary += summary_piece + ' '
+    return summary.strip()
+
+# Function for generating cultural understanding summary
+def cultural_understanding_agent(prompt):
+    scraped_data = web_search_and_scrape(prompt)
+    summary = summarize_text(scraped_data)
+    return summary
+
+# Define function to handle user input and interaction
+def handle_user_input(user_input):
+    if user_input:
+        # Display the user query
+        st.session_state.conversation_history.append({"user": user_input})
+
+        # Fetch cultural understanding or response
+        with st.spinner("Processing your query..."):
+            result = cultural_understanding_agent(user_input)
+
+        # Display AI's response
+        st.session_state.conversation_history.append({"bot": result})
+
+# Input field for user query
+user_input = st.text_input("📝 Enter your cultural query:", placeholder="e.g., Tell me about the festival of Diwali", key="user_input")
+
+if user_input:
+    handle_user_input(user_input)
+
+# Sidebar for Conversation History Toggle
+with st.sidebar:
+    # History Toggle Button
+    if st.button("📜 View Conversation History"):
+        st.write("### Conversation History")
+        for message in st.session_state.conversation_history:
+            if "user" in message:
+                st.markdown(f"**You**: {message['user']}")
+            elif "bot" in message:
+                st.markdown(f"**Sanskriti-Forge**: {message['bot']}")
+                
+# Footer with fixed prompt input at the bottom
+st.markdown("""
+<hr>
+<center>Built with ❤️ for Bharat</center>
+""", unsafe_allow_html=True)
