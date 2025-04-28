@@ -39,22 +39,23 @@ def generate_response(user_input, context=""):
 
 # Display chat history with user on the right and bot on the left
 def display_chat():
-    for i, message in enumerate(st.session_state.conversation_history):
-        # Display the user's message on the right side
-        if message['role'] == 'user':
-            st.markdown(f"""
-            <div style="text-align: right; background-color: #e0f7fa; padding: 10px; margin-bottom: 5px; border-radius: 8px;">
-                <b>User:</b> {message['text']}
-            </div>
-            """, unsafe_allow_html=True)
+    if 'conversation_history' in st.session_state:
+        for i, message in enumerate(st.session_state.conversation_history):
+            # Check if 'role' key exists in message
+            if 'role' in message:
+                if message['role'] == 'user':
+                    st.markdown(f"""
+                    <div style="text-align: right; background-color: #e0f7fa; padding: 10px; margin-bottom: 5px; border-radius: 8px;">
+                        <b>User:</b> {message['text']}
+                    </div>
+                    """, unsafe_allow_html=True)
 
-        # Display the bot's response on the left side
-        elif message['role'] == 'bot':
-            st.markdown(f"""
-            <div style="text-align: left; background-color: #f1f8e9; padding: 10px; margin-bottom: 5px; border-radius: 8px;">
-                <b>Sanskriti-Forge:</b> {message['text']}
-            </div>
-            """, unsafe_allow_html=True)
+                elif message['role'] == 'bot':
+                    st.markdown(f"""
+                    <div style="text-align: left; background-color: #f1f8e9; padding: 10px; margin-bottom: 5px; border-radius: 8px;">
+                        <b>Sanskriti-Forge:</b> {message['text']}
+                    </div>
+                    """, unsafe_allow_html=True)
 
 # User input section
 user_input = st.text_input("📝 Enter your cultural query:", placeholder="e.g., Tell me about Pongal festival")
