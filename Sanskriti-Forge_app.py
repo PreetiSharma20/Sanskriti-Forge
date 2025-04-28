@@ -1,7 +1,9 @@
 import streamlit as st
+from transformers import pipeline
 import os
+import pandas as pd
 
-# Ensure that the necessary libraries are installed
+# Install necessary dependencies (this is just for installation when running locally)
 os.system('pip install streamlit torch transformers pandas')
 
 # Page configuration
@@ -17,8 +19,6 @@ import torch
 st.write(f"PyTorch version: {torch.__version__}")
 
 # Load pre-trained model from Hugging Face
-from transformers import pipeline
-
 @st.cache_resource(show_spinner=True)
 def load_model():
     try:
@@ -29,27 +29,43 @@ def load_model():
 
 nlp = load_model()
 
-# User prompt
+# Initialize chat history in session state
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = []
+
+# Function to generate a response
+def generate_response(user_input):
+    # Combine previous history with the user input to make conversation flow better
+    conversation = "\n".join(st.session_state.conversation_history) + "\nUser: " + user_input
+    response = nlp(conversation, max_length=200, do_sample=True, temperature=0.7)[0]['generated_text']
+    
+    # Clean the response by removing the prompt part
+    generated_response = response.split("User:")[-1].strip()
+    return generated_response
+
+# Chat input and displaying conversation
 user_input = st.text_input("📝 Enter your cultural query:", placeholder="e.g., Tell me about Pongal festival")
 
-# Response display
+# When user inputs something
 if user_input:
+    # Get chatbot's response
     with st.spinner("Generating cultural insights..."):
-        result = nlp(user_input, max_length=200, do_sample=True, temperature=0.7)[0]['generated_text']
-        
-    st.markdown("""
-    ### 🤖 Sanskriti-Forge says:
-    """ + f"> {result.strip()}")
+        chatbot_response = generate_response(user_input)
+    
+    # Store the user input and chatbot response in the session state to maintain history
+    st.session_state.conversation_history.append(f"User: {user_input}")
+    st.session_state.conversation_history.append(f"Sanskriti-Forge: {chatbot_response}")
 
-    # Optional: Save to knowledge pool (simple append to list)
-    if "dataset" not in st.session_state:
-        st.session_state.dataset = []
-    st.session_state.dataset.append({"query": user_input, "response": result.strip()})
+    # Display the conversation
+    for message in st.session_state.conversation_history:
+        if message.startswith("User:"):
+            st.markdown(f"**User:** {message[6:]}")
+        else:
+            st.markdown(f"**Sanskriti-Forge:** {message[16:]}")
 
-# Export dataset
+# Optional: Save the conversation dataset
 if st.button("📁 Download Knowledge Dataset"):
-    import pandas as pd
-    df = pd.DataFrame(st.session_state.get("dataset", []))
+    df = pd.DataFrame(st.session_state.get("conversation_history", []), columns=["Conversation"])
     csv = df.to_csv(index=False).encode('utf-8')
     st.download_button("⬇️ Download CSV", csv, "sanskriti_knowledge_pool.csv", "text/csv")
 
