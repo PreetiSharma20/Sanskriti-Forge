@@ -37,25 +37,24 @@ def generate_response(user_input, context=""):
     generated_response = response.split("User:")[-1].strip()
     return generated_response
 
-# Display chat history
+# Display chat history with user on the right and bot on the left
 def display_chat():
     for i, message in enumerate(st.session_state.conversation_history):
-        # Display the user's message
+        # Display the user's message on the right side
         if message['role'] == 'user':
-            st.markdown(f"**User**: {message['text']}")
-            # Option to reply to this message
-            if st.button(f"Reply to User's message {i+1}", key=f"user_reply_{i}"):
-                user_input = st.text_input("Your reply:", placeholder="Type your reply here")
-                if user_input:
-                    context = "\n".join([msg['text'] for msg in st.session_state.conversation_history[:i+1]])
-                    response = generate_response(user_input, context)
-                    st.session_state.conversation_history.append({'role': 'user', 'text': user_input})
-                    st.session_state.conversation_history.append({'role': 'bot', 'text': response})
-                    st.experimental_rerun()  # Rerun to update the UI
+            st.markdown(f"""
+            <div style="text-align: right; background-color: #e0f7fa; padding: 10px; margin-bottom: 5px; border-radius: 8px;">
+                <b>User:</b> {message['text']}
+            </div>
+            """, unsafe_allow_html=True)
 
-        # Display the bot's response
+        # Display the bot's response on the left side
         elif message['role'] == 'bot':
-            st.markdown(f"**Sanskriti-Forge**: {message['text']}")
+            st.markdown(f"""
+            <div style="text-align: left; background-color: #f1f8e9; padding: 10px; margin-bottom: 5px; border-radius: 8px;">
+                <b>Sanskriti-Forge:</b> {message['text']}
+            </div>
+            """, unsafe_allow_html=True)
 
 # User input section
 user_input = st.text_input("📝 Enter your cultural query:", placeholder="e.g., Tell me about Pongal festival")
