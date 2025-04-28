@@ -1,7 +1,5 @@
 streamlit
-torch
 transformers
-pandas
 sentence-transformers
 beautifulsoup4
 requests
@@ -9,3 +7,4 @@ lxml
 duckduckgo-search
 wikipedia-api
 ipywidgets
+pandas
