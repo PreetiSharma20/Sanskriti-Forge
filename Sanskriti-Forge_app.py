@@ -1,9 +1,10 @@
 import streamlit as st
 from transformers import pipeline
+from PIL import Image
 
 # Page configuration
-st.set_page_config(page_title="Sanskriti-Forge", layout="centered")
-st.title("🧠 Sanskriti-Forge: Indian Culture Chatbot")
+st.set_page_config(page_title="Sanskriti-Forge", layout="wide")
+st.title("🧠 Sanskriti-Forge: Explore Indian Culture")
 st.markdown("""
     Welcome to **Sanskriti-Forge**, your AI companion for exploring India's rich cultural heritage.
     Ask me anything about festivals, rituals, temples, mythology, art, or history! 🙏🇮🇳
@@ -52,6 +53,23 @@ def display_chat():
             </div>
             """, unsafe_allow_html=True)
 
+# Load a few images related to Indian culture
+def display_cultural_images():
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.image("https://upload.wikimedia.org/wikipedia/commons/8/8d/Tirupati_Temple.jpg", caption="Tirupati Temple", use_column_width=True)
+    with col2:
+        st.image("https://upload.wikimedia.org/wikipedia/commons/1/1e/Dussehra_festival_in_India.jpg", caption="Dussehra Festival", use_column_width=True)
+
+# Sidebar for history
+def display_sidebar():
+    st.sidebar.title("Conversation History")
+    for message in reversed(st.session_state.conversation_history):
+        if message['role'] == 'user':
+            st.sidebar.markdown(f"**User:** {message['text']}")
+        elif message['role'] == 'bot':
+            st.sidebar.markdown(f"**Sanskriti-Forge:** {message['text']}")
+
 # Display the user input area at the bottom
 user_input = st.text_input("📝 Enter your cultural query:", placeholder="e.g., Tell me about Pongal festival", key="user_input", help="Type your question and hit Enter!")
 
@@ -68,11 +86,21 @@ if user_input:
     st.session_state.conversation_history.append({'role': 'bot', 'text': response})
 
     # Clear the input field after submitting
-    # The next line is redundant, Streamlit will handle clearing input automatically when user presses Enter
     st.session_state.user_input = ""  # Reset input field
 
-# Display the chat interface
-display_chat()
+# Create two columns for content and chat interaction
+col1, col2 = st.columns([2, 5])
+
+# Show graphics and cultural images
+with col1:
+    display_cultural_images()
+
+# Show chat interface
+with col2:
+    display_chat()
+
+# Display the sidebar for history
+display_sidebar()
 
 # Optional: Save the conversation dataset
 if st.button("📁 Download Knowledge Dataset"):
