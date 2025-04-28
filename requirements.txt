@@ -7,5 +7,5 @@ beautifulsoup4
 requests
 lxml
 duckduckgo-search
-transformers requests ipywidgets
 wikipedia-api
+ipywidgets
